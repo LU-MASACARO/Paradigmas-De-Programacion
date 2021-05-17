@@ -2,34 +2,42 @@ import Text.Show.Functions
 
 type Accion = Participante -> Participante
 
+type Propiedad = (String,Int)
+
 data Participante = UnParticipante{
     nombre :: String,
     cantidadDeDinero :: Int,
     tacticaDeJuego :: String,
-    propiedadesCompradas :: [(String,Int)],
+    propiedadesCompradas :: [Propiedad],
     accionesDeParticipante :: [Accion]
 } deriving (Show)
 
-type Propiedad = (String,Int)
-
 edificio :: Propiedad
 edificio = ("Edificio Blanco",100)
+casa :: Propiedad
+casa = ("Casa Blanca",200)
 
 carolina :: Participante
-carolina = UnParticipante "Carolina" 500 "Accionista" [] [pasarPorElBanco, pagarAAccionistas]
+carolina = UnParticipante "Carolina" 500 "Accionista" [edificio] [pasarPorElBanco, pagarAAccionistas]
 manuel :: Participante
 manuel = UnParticipante "Manuel" 800 "Oferente Singular" [] [pasarPorElBanco, enojarse]
 pedro :: Participante
-pedro = UnParticipante "Pedro" 80 "Apostador" [edificio] [pasarPorElBanco]
+pedro = UnParticipante "Pedro" 80 "Apostador" [casa,edificio] [pasarPorElBanco]
 juan :: Participante
-juan = UnParticipante "j" 80 "Apostador" [] [pasarPorElBanco]
+juan = UnParticipante "juan" 80 "Apostador" [] [pasarPorElBanco]
 
 -----FUNCIONES AUXILIARES-----
-modificarDinero :: (Int->Int->Int)->Participante->Int->Participante
-modificarDinero unaFuncion unParticipante cantidad= unParticipante {cantidadDeDinero = unaFuncion (cantidadDeDinero unParticipante) cantidad}
+modificarDinero :: (Int->Int)->Participante->Participante
+modificarDinero unaFuncion unParticipante = unParticipante {cantidadDeDinero = unaFuncion (cantidadDeDinero unParticipante)}
 
-modificarAcciones :: Participante->Accion->Participante
-modificarAcciones unParticipante unaAccion = unParticipante {accionesDeParticipante = unaAccion : (accionesDeParticipante unParticipante)}
+modificarPropiedades :: Propiedad->Participante->Participante
+modificarPropiedades unaPropiedad unParticipante = unParticipante {propiedadesCompradas = unaPropiedad : propiedadesCompradas unParticipante}
+
+modificarTactica :: String->Participante->Participante
+modificarTactica tactica unParticipante = unParticipante {tacticaDeJuego = tactica}
+
+agregarAccionAJugador :: Accion->Participante->Participante
+agregarAccionAJugador unaAccion unParticipante= unParticipante {accionesDeParticipante = unaAccion : (accionesDeParticipante unParticipante)}
 
 verificarTacticaDeJuego :: Participante->String->Bool
 verificarTacticaDeJuego unParticipante tactica = (==tactica) (tacticaDeJuego unParticipante)
@@ -40,21 +48,24 @@ verificarAptoSubasta unParticipante = (verificarTacticaDeJuego unParticipante "A
 verificarAptoCompra :: Participante->Propiedad->Bool
 verificarAptoCompra unParticipante unaPropiedad = cantidadDeDinero unParticipante >= snd unaPropiedad    
 
-propiedadesBaratasDeParticipante :: Participante->Int
-propiedadesBaratasDeParticipante unParticipante = length (filter (<150) (map snd (propiedadesCompradas unParticipante)))
-
-propiedadesCarasDeParticipante :: Participante->Int
-propiedadesCarasDeParticipante unParticipante = length (filter (>=150) (map snd (propiedadesCompradas unParticipante)))
+cantidadPropiedadesDePrecio :: (Int->Bool)->Participante->Int
+cantidadPropiedadesDePrecio comparacion unParticipante = length (filter comparacion (map snd (propiedadesCompradas unParticipante)))
 
 comprar :: Propiedad->Accion
-comprar unaPropiedad unParticipante = (modificarDinero (-) unParticipante (snd unaPropiedad)) {propiedadesCompradas = unaPropiedad : (propiedadesCompradas unParticipante)}
+comprar unaPropiedad unParticipante = modificarPropiedades unaPropiedad . modificarDinero (subtract (snd unaPropiedad)) $ unParticipante
+
+calculoDeAlquileres :: Participante->Int
+calculoDeAlquileres unParticipante = 10 * (cantidadPropiedadesDePrecio (<150) unParticipante) + 20 * (cantidadPropiedadesDePrecio (>=150) unParticipante)
+
+calculoFinal :: Participante->Participante->Bool
+calculoFinal participante1 participante2 = (cantidadDeDinero ((ultimaRonda participante1) participante1) >= cantidadDeDinero ((ultimaRonda participante2) participante2))
 -----FIN FUNCIONES AUXILIARES-----
 
 pasarPorElBanco :: Accion
-pasarPorElBanco unParticipante = (modificarDinero (+) unParticipante 40) {tacticaDeJuego = "Comprador Compulsivo"}
+pasarPorElBanco unParticipante = modificarTactica "Comprador Compulsivo" . modificarDinero (+40) $ unParticipante
 
 enojarse :: Accion
-enojarse unParticipante = modificarAcciones (modificarDinero (+) unParticipante 50) gritar
+enojarse unParticipante = agregarAccionAJugador gritar . modificarDinero (+50) $ unParticipante
 
 gritar :: Accion
 gritar unParticipante = unParticipante {nombre = "AHHHH " ++ nombre unParticipante}
@@ -64,20 +75,19 @@ subastar unaPropiedad unParticipante | (verificarAptoSubasta unParticipante && v
                                      | otherwise = unParticipante 
 
 cobrarAlquileres :: Accion
-cobrarAlquileres unParticipante = modificarDinero (+) unParticipante (10 * (propiedadesBaratasDeParticipante unParticipante) + 20 * (propiedadesCarasDeParticipante unParticipante)) 
+cobrarAlquileres unParticipante = modificarDinero (+calculoDeAlquileres unParticipante) unParticipante  
 
 pagarAAccionistas :: Accion
-pagarAAccionistas unParticipante | verificarTacticaDeJuego unParticipante "Accionista" = modificarDinero (+) unParticipante 200
-                                 | otherwise = modificarDinero (-) unParticipante 100                      
+pagarAAccionistas unParticipante | verificarTacticaDeJuego unParticipante "Accionista" = modificarDinero (+200) unParticipante 
+                                 | otherwise = modificarDinero (subtract 100) unParticipante                       
 
 hacerBerrinchePor :: Propiedad->Accion
 hacerBerrinchePor unaPropiedad unParticipante | verificarAptoCompra unParticipante unaPropiedad = comprar unaPropiedad unParticipante
-                                              | otherwise = hacerBerrinchePor unaPropiedad (modificarAcciones (modificarDinero (+) unParticipante 10) gritar)
+                                              | otherwise = hacerBerrinchePor unaPropiedad (agregarAccionAJugador gritar (modificarDinero (+10) unParticipante ))
 
 ultimaRonda :: Participante->Accion
 ultimaRonda unParticipante = foldl1 (.) (accionesDeParticipante unParticipante) 
 
-juegoFinal :: Participante->Participante->String
-juegoFinal participante1 participante2 | (cantidadDeDinero ((ultimaRonda participante1) participante1) > cantidadDeDinero ((ultimaRonda participante2) participante2)) = "El ganador es el participante 1"
-                                       | (cantidadDeDinero ((ultimaRonda participante1) participante1) < cantidadDeDinero ((ultimaRonda participante2) participante2)) = "El ganador es el participante 2"
-                                       | otherwise = "Hay un empate"
+juegoFinal :: Participante->Participante->Participante
+juegoFinal participante1 participante2 | calculoFinal participante1 participante2 = participante1
+                                       | otherwise = participante2
