@@ -40,16 +40,19 @@ agregarAccionAJugador :: Accion->Participante->Participante
 agregarAccionAJugador unaAccion unParticipante= unParticipante {accionesDeParticipante = unaAccion : (accionesDeParticipante unParticipante)}
 
 verificarTacticaDeJuego :: Participante->String->Bool
-verificarTacticaDeJuego unParticipante tactica = (==tactica) (tacticaDeJuego unParticipante)
+verificarTacticaDeJuego unParticipante tactica = (==tactica) . tacticaDeJuego $ unParticipante
 
 verificarAptoSubasta :: Participante->Bool
-verificarAptoSubasta unParticipante = (verificarTacticaDeJuego unParticipante "Accionista") || (verificarTacticaDeJuego unParticipante "Oferente Singular") 
+verificarAptoSubasta unParticipante = verificarTacticaDeJuego unParticipante "Accionista" || verificarTacticaDeJuego unParticipante "Oferente Singular"
 
 verificarAptoCompra :: Participante->Propiedad->Bool
 verificarAptoCompra unParticipante unaPropiedad = cantidadDeDinero unParticipante >= snd unaPropiedad    
 
+preciosDePropiedadesCompradas :: Participante->[Int]
+preciosDePropiedadesCompradas unParticipante = map snd (propiedadesCompradas unParticipante)
+
 cantidadPropiedadesDePrecio :: (Int->Bool)->Participante->Int
-cantidadPropiedadesDePrecio comparacion unParticipante = length (filter comparacion (map snd (propiedadesCompradas unParticipante)))
+cantidadPropiedadesDePrecio comparacion unParticipante = length . filter comparacion $ (preciosDePropiedadesCompradas unParticipante)
 
 comprar :: Propiedad->Accion
 comprar unaPropiedad unParticipante = modificarPropiedades unaPropiedad . modificarDinero (subtract (snd unaPropiedad)) $ unParticipante
@@ -57,8 +60,11 @@ comprar unaPropiedad unParticipante = modificarPropiedades unaPropiedad . modifi
 calculoDeAlquileres :: Participante->Int
 calculoDeAlquileres unParticipante = 10 * (cantidadPropiedadesDePrecio (<150) unParticipante) + 20 * (cantidadPropiedadesDePrecio (>=150) unParticipante)
 
-calculoFinal :: Participante->Participante->Bool
-calculoFinal participante1 participante2 = (cantidadDeDinero ((ultimaRonda participante1) participante1) >= cantidadDeDinero ((ultimaRonda participante2) participante2))
+cantidadDeDineroEnUltimaRonda :: Participante->Int
+cantidadDeDineroEnUltimaRonda unParticipante = cantidadDeDinero . (ultimaRonda unParticipante) $ unParticipante
+
+tieneMayorPlataEnUltimaRondaQue :: Participante->Participante->Bool
+tieneMayorPlataEnUltimaRondaQue participante1 participante2 = cantidadDeDineroEnUltimaRonda participante1 >= cantidadDeDineroEnUltimaRonda participante2
 -----FIN FUNCIONES AUXILIARES-----
 
 pasarPorElBanco :: Accion
@@ -75,7 +81,7 @@ subastar unaPropiedad unParticipante | (verificarAptoSubasta unParticipante && v
                                      | otherwise = unParticipante 
 
 cobrarAlquileres :: Accion
-cobrarAlquileres unParticipante = modificarDinero (+calculoDeAlquileres unParticipante) unParticipante  
+cobrarAlquileres unParticipante = modificarDinero (+ calculoDeAlquileres unParticipante) unParticipante  
 
 pagarAAccionistas :: Accion
 pagarAAccionistas unParticipante | verificarTacticaDeJuego unParticipante "Accionista" = modificarDinero (+200) unParticipante 
@@ -83,11 +89,12 @@ pagarAAccionistas unParticipante | verificarTacticaDeJuego unParticipante "Accio
 
 hacerBerrinchePor :: Propiedad->Accion
 hacerBerrinchePor unaPropiedad unParticipante | verificarAptoCompra unParticipante unaPropiedad = comprar unaPropiedad unParticipante
-                                              | otherwise = hacerBerrinchePor unaPropiedad (agregarAccionAJugador gritar (modificarDinero (+10) unParticipante ))
+                                              | otherwise = hacerBerrinchePor unaPropiedad . agregarAccionAJugador gritar $ (modificarDinero (+10) unParticipante)
 
 ultimaRonda :: Participante->Accion
 ultimaRonda unParticipante = foldl1 (.) (accionesDeParticipante unParticipante) 
 
 juegoFinal :: Participante->Participante->Participante
-juegoFinal participante1 participante2 | calculoFinal participante1 participante2 = participante1
+juegoFinal participante1 participante2 | tieneMayorPlataEnUltimaRondaQue participante1 participante2 = participante1
                                        | otherwise = participante2
+
