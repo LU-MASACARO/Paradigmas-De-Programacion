@@ -37,7 +37,7 @@ a) Agregar los mínimos hechos y reglas necesarios para poder consultar.
 b) Mostrar las consultas utilizadas para conseguir lo anterior, junto con las respuestas obtenidas.
 
 - Existe alguien que odie a Milhouse.
-Se utiliza la consulta -> esOdiadoPor(Alguien,milhouse).
+Se utiliza la consulta -> esOdiadoPor(_,milhouse).
 La consola responde False.
 
 - A quien odia Charles.
